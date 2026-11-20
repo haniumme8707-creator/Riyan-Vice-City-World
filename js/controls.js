@@ -20,11 +20,11 @@ export class MobileControls {
     this.keys = {};
     this.joystickActive = false;
     this.pointerId = null;
-
     this.maxDistance = 32;
 
     this.setupJoystick();
     this.setupRunButton();
+    this.setupActionButton();
     this.setupKeyboard();
   }
 
@@ -36,7 +36,6 @@ export class MobileControls {
       this.pointerId = event.pointerId;
 
       this.joystick.setPointerCapture(event.pointerId);
-
       this.updateJoystick(event);
     });
 
@@ -48,27 +47,16 @@ export class MobileControls {
       this.updateJoystick(event);
     });
 
-    const stopJoystick = (event) => {
+    const stop = (event) => {
       if (event.pointerId !== this.pointerId) return;
 
-      this.joystickActive = false;
-      this.pointerId = null;
-
-      this.x = 0;
-      this.y = 0;
-
-      this.knob.style.transform =
-        "translate(-50%, -50%)";
+      this.resetJoystick();
     };
 
-    this.joystick.addEventListener("pointerup", stopJoystick);
-    this.joystick.addEventListener("pointercancel", stopJoystick);
+    this.joystick.addEventListener("pointerup", stop);
+    this.joystick.addEventListener("pointercancel", stop);
     this.joystick.addEventListener("lostpointercapture", () => {
-      this.joystickActive = false;
-      this.pointerId = null;
-      this.x = 0;
-      this.y = 0;
-      this.knob.style.transform = "translate(-50%, -50%)";
+      this.resetJoystick();
     });
   }
 
@@ -95,19 +83,35 @@ export class MobileControls {
       `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
   }
 
+  resetJoystick() {
+    this.joystickActive = false;
+    this.pointerId = null;
+    this.x = 0;
+    this.y = 0;
+
+    this.knob.style.transform = "translate(-50%, -50%)";
+  }
+
   setupRunButton() {
     this.runButton.addEventListener("pointerdown", (event) => {
       event.preventDefault();
       this.running = true;
     });
 
-    const stopRunning = () => {
+    const stop = () => {
       this.running = false;
     };
 
-    this.runButton.addEventListener("pointerup", stopRunning);
-    this.runButton.addEventListener("pointercancel", stopRunning);
-    this.runButton.addEventListener("lostpointercapture", stopRunning);
+    this.runButton.addEventListener("pointerup", stop);
+    this.runButton.addEventListener("pointercancel", stop);
+    this.runButton.addEventListener("lostpointercapture", stop);
+  }
+
+  setupActionButton() {
+    this.actionButton.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      window.dispatchEvent(new CustomEvent("riyan-action"));
+    });
   }
 
   setupKeyboard() {
@@ -122,8 +126,7 @@ export class MobileControls {
     window.addEventListener("blur", () => {
       this.keys = {};
       this.running = false;
-      this.x = 0;
-      this.y = 0;
+      this.resetJoystick();
     });
   }
 
@@ -149,13 +152,14 @@ export class MobileControls {
       this.player.position.x += moveX * speed * delta;
       this.player.position.z += moveZ * speed * delta;
 
-      this.player.rotation.y = Math.atan2(moveX, moveZ) + Math.PI;
+      this.player.rotation.y =
+        Math.atan2(moveX, moveZ) + Math.PI;
     }
   }
 
   destroy() {
     this.running = false;
-    this.x = 0;
-    this.y = 0;
+    this.resetJoystick();
+    this.keys = {};
   }
 }
