@@ -1,4 +1,8 @@
+
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js";
+
+import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/loaders/GLTFLoader.js";
+
 import { MobileControls } from "./controls.js";
 
 /* =================================
@@ -22,6 +26,7 @@ let renderer;
 let clock;
 let player;
 let controls;
+let characterModel;
 
 let gameStarted = false;
 
@@ -49,7 +54,7 @@ startButton.addEventListener("click", async () => {
       await screen.orientation.lock("landscape");
     }
   } catch (error) {
-    console.log("Orientation/fullscreen unavailable:", error);
+    console.log("Fullscreen/orientation unavailable:", error);
   }
 
   startScreen.hidden = true;
@@ -84,10 +89,7 @@ function initializeGame() {
     powerPreference: "high-performance"
   });
 
-  renderer.setPixelRatio(
-    Math.min(window.devicePixelRatio, 1.5)
-  );
-
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
   renderer.setSize(window.innerWidth, window.innerHeight);
 
   gameWorld.innerHTML = "";
@@ -101,7 +103,6 @@ function initializeGame() {
   createGround();
   createPlayer();
 
-  // Connect mobile and keyboard controls
   controls = new MobileControls(player);
 
   window.addEventListener("resize", resizeGame);
@@ -122,10 +123,7 @@ function createLighting() {
 
   scene.add(ambientLight);
 
-  const sun = new THREE.DirectionalLight(
-    0xffffff,
-    2
-  );
+  const sun = new THREE.DirectionalLight(0xffffff, 2);
 
   sun.position.set(-10, 20, 10);
   scene.add(sun);
@@ -173,76 +171,67 @@ function createGround() {
 }
 
 /* =================================
-   TEMPORARY PLAYER MODEL
+   PLAYER + RIYAN GLB MODEL
 ================================= */
 
 function createPlayer() {
   player = new THREE.Group();
 
-  const skin = new THREE.MeshStandardMaterial({
-    color: 0x9b6247,
-    roughness: 0.9
-  });
-
-  const shirt = new THREE.MeshStandardMaterial({
-    color: 0x242a38
-  });
-
-  const pants = new THREE.MeshStandardMaterial({
-    color: 0x171c28
-  });
-
-  const hair = new THREE.MeshStandardMaterial({
-    color: 0x111116
-  });
-
-  const body = new THREE.Mesh(
-    new THREE.BoxGeometry(0.85, 1.05, 0.45),
-    shirt
-  );
-
-  body.position.y = 1.35;
-  player.add(body);
-
-  const head = new THREE.Mesh(
-    new THREE.SphereGeometry(0.32, 20, 20),
-    skin
-  );
-
-  head.position.y = 2.15;
-  player.add(head);
-
-  const hairMesh = new THREE.Mesh(
-    new THREE.SphereGeometry(0.33, 20, 12),
-    hair
-  );
-
-  hairMesh.scale.set(1, 0.55, 1);
-  hairMesh.position.set(0, 2.34, 0);
-  player.add(hairMesh);
-
-  for (const side of [-1, 1]) {
-    const leg = new THREE.Mesh(
-      new THREE.BoxGeometry(0.3, 0.9, 0.35),
-      pants
-    );
-
-    leg.position.set(side * 0.23, 0.45, 0);
-    player.add(leg);
-  }
-
-  for (const side of [-1, 1]) {
-    const arm = new THREE.Mesh(
-      new THREE.BoxGeometry(0.23, 0.9, 0.25),
-      skin
-    );
-
-    arm.position.set(side * 0.58, 1.35, 0);
-    player.add(arm);
-  }
-
   player.position.set(0, 0, 0);
   scene.add(player);
+
+  const loader = new GLTFLoader();
+
+  loader.load(
+    "./assets/models/riyan.glb",
+
+    (gltf) => {
+      characterModel = gltf.scene;
+
+      // Calculate model dimensions
+      const box = new THREE.Box3().setFromObject(characterModel);
+      const size = box.getSize(new THREE.Vector3());
+
+      // Set character height to approximately 1.8 units
+      const desiredHeight = 1.8;
+
+      if (size.y > 0) {
+        const scale = desiredHeight / size.y;
+        characterModel.scale.setScalar(scale);
+      }
+
+      // Recalculate bounds after scaling
+      const scaledBox = new THREE.Box3().setFromObject(characterModel);
+
+      // Place model feet on the ground
+      characterModel.position.y -= scaledBox.min.y;
+
+      // Improve model lighting
+      characterModel.traverse((object) => {
+        if (object.isMesh) {
+          object.castShadow = true;
+          object.receiveShadow = true;
+        }
+      });
+
+      player.add(characterModel);
+
+      console.log("Riyan 3D model loaded successfully!");
+    },
+
+    (progress) => {
+      if (progress.total) {
+        console.log(
+          "Riyan model loading:",
+          Math.round((progress.loaded / progress.total) * 100) + "%"
+        );
+      }
+    },
+
+    (error) => {
+      console.error("Could not load riyan.glb:", error);
+    }
+  );
 }
 
 /* =================================
@@ -273,10 +262,10 @@ function animate() {
 
   const delta = Math.min(clock.getDelta(), 0.05);
 
-  // Update player movement
-  controls.update(delta);
+  if (controls) {
+    controls.update(delta);
+  }
 
-  // Follow player
   updateCamera();
 
   renderer.render(scene, camera);
@@ -292,10 +281,7 @@ function resizeGame() {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
 
-  renderer.setSize(
-    window.innerWidth,
-    window.innerHeight
-  );
+  renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
 /* =================================
@@ -308,4 +294,12 @@ mapButton.addEventListener("click", () => {
 
 closeMap.addEventListener("click", () => {
   mapPanel.hidden = true;
+});
+
+/* =================================
+   ACTION BUTTON EVENT
+================================= */
+
+window.addEventListener("riyan-action", () => {
+  console.log("Riyan action button pressed");
 });
