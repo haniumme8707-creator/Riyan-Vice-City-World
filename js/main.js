@@ -1,5 +1,5 @@
-
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js";
+import { MobileControls } from "./controls.js";
 
 /* =================================
    RIYAN — VICE CITY WORLD
@@ -20,9 +20,8 @@ let scene;
 let camera;
 let renderer;
 let clock;
-
 let player;
-let animationFrame;
+let controls;
 
 let gameStarted = false;
 
@@ -46,11 +45,11 @@ startButton.addEventListener("click", async () => {
       await document.documentElement.requestFullscreen();
     }
 
-    if (screen.orientation && screen.orientation.lock) {
+    if (screen.orientation?.lock) {
       await screen.orientation.lock("landscape");
     }
   } catch (error) {
-    console.log("Landscape/fullscreen unavailable:", error);
+    console.log("Orientation/fullscreen unavailable:", error);
   }
 
   startScreen.hidden = true;
@@ -102,6 +101,9 @@ function initializeGame() {
   createGround();
   createPlayer();
 
+  // Connect mobile and keyboard controls
+  controls = new MobileControls(player);
+
   window.addEventListener("resize", resizeGame);
 
   animate();
@@ -134,24 +136,16 @@ function createLighting() {
 ================================= */
 
 function createGround() {
-  const groundGeometry = new THREE.PlaneGeometry(
-    200,
-    200
-  );
-
-  const groundMaterial = new THREE.MeshStandardMaterial({
-    color: 0x5c8060,
-    roughness: 1
-  });
-
   const ground = new THREE.Mesh(
-    groundGeometry,
-    groundMaterial
+    new THREE.PlaneGeometry(200, 200),
+    new THREE.MeshStandardMaterial({
+      color: 0x5c8060,
+      roughness: 1
+    })
   );
 
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = -0.05;
-
   scene.add(ground);
 
   const road = new THREE.Mesh(
@@ -164,8 +158,6 @@ function createGround() {
 
   road.rotation.x = -Math.PI / 2;
   road.position.y = 0;
-  road.position.x = 0;
-
   scene.add(road);
 
   const roadLine = new THREE.Mesh(
@@ -177,7 +169,6 @@ function createGround() {
 
   roadLine.rotation.x = -Math.PI / 2;
   roadLine.position.set(0, 0.02, 0);
-
   scene.add(roadLine);
 }
 
@@ -205,7 +196,6 @@ function createPlayer() {
     color: 0x111116
   });
 
-  // Body
   const body = new THREE.Mesh(
     new THREE.BoxGeometry(0.85, 1.05, 0.45),
     shirt
@@ -214,7 +204,6 @@ function createPlayer() {
   body.position.y = 1.35;
   player.add(body);
 
-  // Head
   const head = new THREE.Mesh(
     new THREE.SphereGeometry(0.32, 20, 20),
     skin
@@ -223,7 +212,6 @@ function createPlayer() {
   head.position.y = 2.15;
   player.add(head);
 
-  // Hair
   const hairMesh = new THREE.Mesh(
     new THREE.SphereGeometry(0.33, 20, 12),
     hair
@@ -233,8 +221,7 @@ function createPlayer() {
   hairMesh.position.set(0, 2.34, 0);
   player.add(hairMesh);
 
-  // Legs
-  for (let side of [-1, 1]) {
+  for (const side of [-1, 1]) {
     const leg = new THREE.Mesh(
       new THREE.BoxGeometry(0.3, 0.9, 0.35),
       pants
@@ -244,8 +231,7 @@ function createPlayer() {
     player.add(leg);
   }
 
-  // Arms
-  for (let side of [-1, 1]) {
+  for (const side of [-1, 1]) {
     const arm = new THREE.Mesh(
       new THREE.BoxGeometry(0.23, 0.9, 0.25),
       skin
@@ -256,12 +242,11 @@ function createPlayer() {
   }
 
   player.position.set(0, 0, 0);
-
   scene.add(player);
 }
 
 /* =================================
-   CAMERA
+   THIRD PERSON CAMERA
 ================================= */
 
 function updateCamera() {
@@ -284,10 +269,14 @@ function updateCamera() {
 ================================= */
 
 function animate() {
-  animationFrame = requestAnimationFrame(animate);
+  requestAnimationFrame(animate);
 
-  const delta = clock.getDelta();
+  const delta = Math.min(clock.getDelta(), 0.05);
 
+  // Update player movement
+  controls.update(delta);
+
+  // Follow player
   updateCamera();
 
   renderer.render(scene, camera);
@@ -301,7 +290,6 @@ function resizeGame() {
   if (!camera || !renderer) return;
 
   camera.aspect = window.innerWidth / window.innerHeight;
-
   camera.updateProjectionMatrix();
 
   renderer.setSize(
