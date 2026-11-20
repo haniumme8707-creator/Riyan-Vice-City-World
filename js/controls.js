@@ -1,67 +1,73 @@
 
-/* =====================================
-   RIYAN — VICE CITY WORLD
-   Mobile Movement Controls
-===================================== */
-
 export class MobileControls {
-  constructor(player) {
+  constructor(player, getCameraYaw = () => 0) {
     this.player = player;
+    this.getCameraYaw = getCameraYaw;
+
+    this.moveX = 0;
+    this.moveZ = 0;
+    this.running = false;
+    this.keys = {};
+    this.speed = 5;
+    this.runSpeed = 9;
 
     this.joystick = document.getElementById("joystick");
     this.knob = document.getElementById("joystick-knob");
     this.runButton = document.getElementById("run-button");
     this.actionButton = document.getElementById("action-button");
 
-    this.x = 0;
-    this.y = 0;
-    this.running = false;
+    this.joystickPointer = null;
+    this.joystickRect = null;
 
-    this.keys = {};
-    this.joystickActive = false;
-    this.pointerId = null;
-    this.maxDistance = 32;
+    this.onKeyDown = (event) => {
+      this.keys[event.key.toLowerCase()] = true;
+    };
+
+    this.onKeyUp = (event) => {
+      this.keys[event.key.toLowerCase()] = false;
+    };
+
+    window.addEventListener("keydown", this.onKeyDown);
+    window.addEventListener("keyup", this.onKeyUp);
 
     this.setupJoystick();
     this.setupRunButton();
     this.setupActionButton();
-    this.setupKeyboard();
   }
 
   setupJoystick() {
+    if (!this.joystick || !this.knob) return;
+
     this.joystick.addEventListener("pointerdown", (event) => {
       event.preventDefault();
-
-      this.joystickActive = true;
-      this.pointerId = event.pointerId;
-
+      this.joystickPointer = event.pointerId;
       this.joystick.setPointerCapture(event.pointerId);
+      this.joystickRect = this.joystick.getBoundingClientRect();
       this.updateJoystick(event);
     });
 
     this.joystick.addEventListener("pointermove", (event) => {
-      if (!this.joystickActive) return;
-      if (event.pointerId !== this.pointerId) return;
-
-      event.preventDefault();
+      if (event.pointerId !== this.joystickPointer) return;
       this.updateJoystick(event);
     });
 
-    const stop = (event) => {
-      if (event.pointerId !== this.pointerId) return;
+    const stopJoystick = (event) => {
+      if (event.pointerId !== this.joystickPointer) return;
 
-      this.resetJoystick();
+      this.joystickPointer = null;
+      this.moveX = 0;
+      this.moveZ = 0;
+
+      this.knob.style.transform = "translate(0px, 0px)";
     };
 
-    this.joystick.addEventListener("pointerup", stop);
-    this.joystick.addEventListener("pointercancel", stop);
-    this.joystick.addEventListener("lostpointercapture", () => {
-      this.resetJoystick();
-    });
+    this.joystick.addEventListener("pointerup", stopJoystick);
+    this.joystick.addEventListener("pointercancel", stopJoystick);
+    this.joystick.addEventListener("lostpointercapture", stopJoystick);
   }
 
   updateJoystick(event) {
-    const rect = this.joystick.getBoundingClientRect();
+    const rect = this.joystickRect || this.joystick.getBoundingClientRect();
 
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
@@ -69,97 +75,86 @@ export class MobileControls {
     let dx = event.clientX - centerX;
     let dy = event.clientY - centerY;
 
+    const maxDistance = rect.width * 0.32;
     const distance = Math.hypot(dx, dy);
 
-    if (distance > this.maxDistance) {
-      dx = (dx / distance) * this.maxDistance;
-      dy = (dy / distance) * this.maxDistance;
+    if (distance > maxDistance) {
+      dx = (dx / distance) * maxDistance;
+      dy = (dy / distance) * maxDistance;
     }
 
-    this.x = dx / this.maxDistance;
-    this.y = dy / this.maxDistance;
+    this.moveX = dx / maxDistance;
+    this.moveZ = dy / maxDistance;
 
-    this.knob.style.transform =
-      `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
-  }
-
-  resetJoystick() {
-    this.joystickActive = false;
-    this.pointerId = null;
-    this.x = 0;
-    this.y = 0;
-
-    this.knob.style.transform = "translate(-50%, -50%)";
+    this.knob.style.transform = `translate(${dx}px, ${dy}px)`;
   }
 
   setupRunButton() {
+    if (!this.runButton) return;
+
     this.runButton.addEventListener("pointerdown", (event) => {
       event.preventDefault();
       this.running = true;
+      this.runButton.setPointerCapture(event.pointerId);
     });
 
-    const stop = () => {
+    const stopRun = () => {
       this.running = false;
     };
 
-    this.runButton.addEventListener("pointerup", stop);
-    this.runButton.addEventListener("pointercancel", stop);
-    this.runButton.addEventListener("lostpointercapture", stop);
+    this.runButton.addEventListener("pointerup", stopRun);
+    this.runButton.addEventListener("pointercancel", stopRun);
+    this.runButton.addEventListener("lostpointercapture", stopRun);
   }
 
   setupActionButton() {
-    this.actionButton.addEventListener("pointerdown", (event) => {
-      event.preventDefault();
+    if (!this.actionButton) return;
+
+    this.actionButton.addEventListener("click", () => {
       window.dispatchEvent(new CustomEvent("riyan-action"));
     });
   }
 
-  setupKeyboard() {
-    window.addEventListener("keydown", (event) => {
-      this.keys[event.key.toLowerCase()] = true;
-    });
-
-    window.addEventListener("keyup", (event) => {
-      this.keys[event.key.toLowerCase()] = false;
-    });
-
-    window.addEventListener("blur", () => {
-      this.keys = {};
-      this.running = false;
-      this.resetJoystick();
-    });
-  }
-
   update(delta) {
-    let moveX = this.x;
-    let moveZ = this.y;
+    let x = this.moveX;
+    let z = this.moveZ;
 
-    if (this.keys["w"] || this.keys["arrowup"]) moveZ -= 1;
-    if (this.keys["s"] || this.keys["arrowdown"]) moveZ += 1;
-    if (this.keys["a"] || this.keys["arrowleft"]) moveX -= 1;
-    if (this.keys["d"] || this.keys["arrowright"]) moveX += 1;
+    if (this.keys["w"] || this.keys["arrowup"]) z -= 1;
+    if (this.keys["s"] || this.keys["arrowdown"]) z += 1;
+    if (this.keys["a"] || this.keys["arrowleft"]) x -= 1;
+    if (this.keys["d"] || this.keys["arrowright"]) x += 1;
 
-    const length = Math.hypot(moveX, moveZ);
+    const length = Math.hypot(x, z);
 
-    if (length > 1) {
-      moveX /= length;
-      moveZ /= length;
-    }
+    if (length < 0.08) return false;
 
-    if (length > 0.08) {
-      const speed = this.running ? 8 : 4;
+    x /= length;
+    z /= length;
 
-      this.player.position.x += moveX * speed * delta;
-      this.player.position.z += moveZ * speed * delta;
+    const yaw = this.getCameraYaw();
 
-      this.player.rotation.y =
-        Math.atan2(moveX, moveZ) + Math.PI;
-    }
+    // Camera-relative movement
+    const worldX = x * Math.cos(yaw) + z * Math.sin(yaw);
+    const worldZ = -x * Math.sin(yaw) + z * Math.cos(yaw);
+
+    const speed = this.running ? this.runSpeed : this.speed;
+
+    this.player.position.x += worldX * speed * delta;
+    this.player.position.z += worldZ * speed * delta;
+
+    // Keep Riyan inside the island
+    const limit = 91;
+    this.player.position.x = Math.max(-limit, Math.min(limit, this.player.position.x));
+    this.player.position.z = Math.max(-limit, Math.min(limit, this.player.position.z));
+
+    // Face the direction of movement
+    this.player.rotation.y = Math.atan2(worldX, worldZ) + Math.PI;
+
+    return true;
   }
 
   destroy() {
-    this.running = false;
-    this.resetJoystick();
-    this.keys = {};
+    window.removeEventListener("keydown", this.onKeyDown);
+    window.removeEventListener("keyup", this.onKeyUp);
   }
 }
