@@ -485,3 +485,21 @@ button {
   touch-action: none;
 }
 
+#loading-screen[hidden] {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+#start-screen {
+  position: relative;
+  z-index: 10;
+}
+
+#start-button {
+  position: relative;
+  z-index: 20;
+  pointer-events: auto !important;
+  cursor: pointer;
+}
+
