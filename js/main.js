@@ -95,7 +95,11 @@ function init() {
 
   animate();
 
-  if (loadingScreen) loadingScreen.hidden = true;
+if (loadingScreen) {
+  loadingScreen.hidden = true;
+  loadingScreen.style.display = "none";
+  loadingScreen.style.pointerEvents = "none";
+}
 }
 
 function addLighting() {
